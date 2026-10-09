@@ -4,6 +4,15 @@
 
 **DISCLAIMER: THIS IS AN UNOFFICIAL PROJECT AND USES AI AS PART OF THE DEVELOPMENT. IT IS NOT CREATED OR HANDLED BY THE HARBOUR MASTERS TEAM. BRING ANY IDEAS, QUESTIONS, OR CONCERNS TO ME DIRECTLY!**
 
+## This fork: Majora's Mask entrance randomizer
+
+This fork of [Varuuna/ComboShip](https://github.com/Varuuna/ComboShip) adds an entrance randomizer for Majora's Mask: dungeons, bosses, overworld, interiors, grottos, owl warps and cycle start, with mixed pools and decoupled entrances.
+
+- **Play it (Windows):** [download the build](https://github.com/marufmamun30/ComboShip-EntranceRando/archive/refs/heads/windows-build.zip), extract it and run `ComboShip.exe`. [Setup notes and known rough edges](https://github.com/marufmamun30/ComboShip-EntranceRando/tree/windows-build#readme). You need your own Ocarina of Time and Majora's Mask ROMs.
+- **Source:** this branch. The change on its own is the [`feat/mm-entrance-rando`](https://github.com/marufmamun30/ComboShip-EntranceRando/tree/feat/mm-entrance-rando) branch; design notes are in [`docs/deviations/mm-entrance-rando.md`](docs/deviations/mm-entrance-rando.md).
+
+It is an early test build: seed generation is verified, in-game behaviour has had little play time.
+
 ## What it is
 
 Like [OOTMM](https://ootmm.com/), ComboShip shuffles items across *both* games at once: a check in Ocarina of Time can hold a Majora's Mask item and vice-versa, and a single seed spans the two. Both games run together in one application; ComboShip builds that combined runtime on top of the existing Ship of Harkinian and 2 Ship 2 Harkinian ports.
