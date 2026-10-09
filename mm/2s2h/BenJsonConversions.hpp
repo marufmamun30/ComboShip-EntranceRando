@@ -61,6 +61,16 @@ inline void to_json(json& j, const RandoSaveInfo& rando) {
         { "sariaHintsAvailable", rando.sariaHintsAvailable },
         { "sariaPriorityItems", rando.sariaPriorityItems },
     };
+    // Entrance randomizer layout, flattened to four numbers per shuffled entrance.
+    std::vector<u16> entranceOverrides;
+    for (u16 i = 0; i < rando.entranceOverrideCount && i < RANDO_ENTRANCE_OVERRIDES_MAX; i++) {
+        entranceOverrides.push_back(rando.entranceOverrides[i].fromTo);
+        entranceOverrides.push_back(rando.entranceOverrides[i].fromReturn);
+        entranceOverrides.push_back(rando.entranceOverrides[i].toTo);
+        entranceOverrides.push_back(rando.entranceOverrides[i].toReturn);
+    }
+    j["entranceOverrides"] = entranceOverrides;
+    j["entranceDiscovered"] = rando.entranceDiscovered;
 #ifdef COMBO_BUILD
     j["pendingTrapCount"] = rando.pendingTrapCount; // ComboShip: deferred cross-world traps
 #endif
@@ -71,12 +81,33 @@ inline void from_json(const json& j, RandoSaveInfo& rando) {
     j.at("randoEvents").get_to(rando.randoEvents);
     j.at("randoSaveChecks").get_to(rando.randoSaveChecks);
     j.at("finalSeed").get_to(rando.finalSeed);
-    j.at("randoSaveOptions").get_to(rando.randoSaveOptions);
+    // Options are stored by index and new ones are appended, so a save written before an option
+    // existed has a shorter array. Read what is there and leave the rest at 0 (off).
+    {
+        auto savedOptions = j.at("randoSaveOptions").get<std::vector<u32>>();
+        for (size_t i = 0; i < RO_MAX; i++) {
+            rando.randoSaveOptions[i] = i < savedOptions.size() ? savedOptions[i] : 0;
+        }
+    }
     j.at("randoStartingItems").get_to(rando.randoStartingItems);
     j.at("foundDungeonKeys").get_to(rando.foundDungeonKeys);
     j.at("foundTriforcePieces").get_to(rando.foundTriforcePieces);
     j.at("sariaHintsAvailable").get_to(rando.sariaHintsAvailable);
     j.at("sariaPriorityItems").get_to(rando.sariaPriorityItems);
+    {
+        auto entranceOverrides = j.value("entranceOverrides", std::vector<u16>());
+        rando.entranceOverrideCount = 0;
+        for (size_t i = 0;
+             i + 3 < entranceOverrides.size() && rando.entranceOverrideCount < RANDO_ENTRANCE_OVERRIDES_MAX; i += 4) {
+            rando.entranceOverrides[rando.entranceOverrideCount++] = { entranceOverrides[i], entranceOverrides[i + 1],
+                                                                       entranceOverrides[i + 2],
+                                                                       entranceOverrides[i + 3] };
+        }
+        auto entranceDiscovered = j.value("entranceDiscovered", std::vector<u8>());
+        for (size_t i = 0; i < sizeof(rando.entranceDiscovered); i++) {
+            rando.entranceDiscovered[i] = i < entranceDiscovered.size() ? entranceDiscovered[i] : 0;
+        }
+    }
 #ifdef COMBO_BUILD
     rando.pendingTrapCount = j.value("pendingTrapCount", (u8)0); // tolerate pre-existing combo saves
 #endif

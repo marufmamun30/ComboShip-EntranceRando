@@ -2,6 +2,7 @@
 #include "2s2h/ShipInit.hpp"
 
 #include "Logic.h"
+#include "2s2h/Rando/Entrance/Entrance.h"
 
 namespace Rando {
 
@@ -96,6 +97,13 @@ RandoRegionId GetRegionIdFromEntrance(s32 entrance) {
                 modifiedEntrance = ENTRANCE(GROTTOS, 27);
                 break;
         }
+    }
+
+    // Once holes are shuffled the scene the player dropped in from no longer says which of the shared
+    // grottos this is, the entrance shuffle keeps track of that itself
+    if ((entrance == ENTRANCE(GROTTOS, 4) || entrance == ENTRANCE(GROTTOS, 10)) && Rando::Entrance::IsShuffled() &&
+        Rando::Entrance::GetActiveGrotto() >= 0) {
+        modifiedEntrance = Rando::Entrance::GetActiveGrotto();
     }
 
     if (entranceToRegionId.contains(modifiedEntrance)) {
@@ -207,7 +215,9 @@ void FindReachableRegions(RandoRegionId currentRegion, std::set<RandoRegionId>& 
         // Set global time for check evaluation
         gCurrentRegionTime = currentTime;
 
-        RandoRegionId connectedRegionId = GetRegionIdFromEntrance(exitId);
+        // With entrance shuffle the exit leads wherever it was connected to, vanilla otherwise
+        RandoRegionId connectedRegionId =
+            Rando::Entrance::ResolveExitRegion(exitId, regionExit.returnEntrance, GetRegionIdFromEntrance(exitId));
         if (regionExit.condition()) {
             auto& targetRegion = Regions[connectedRegionId];
             RegionTimeState incomingState = { .timeSlices = currentTime,

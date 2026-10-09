@@ -79,6 +79,7 @@ CrowdControl* CrowdControl::Instance;
 #include "2s2h/Rando/Rando.h"
 #include "2s2h/Rando/Spoiler/Spoiler.h"
 #include "2s2h/Rando/Logic/Logic.h"
+#include "2s2h/Rando/Entrance/Entrance.h"
 #include "2s2h/Rando/MiscBehavior/ClockShuffle.h"
 #include "2s2h/SaveManager/SaveManager.h"
 #include "2s2h/CustomMessage/CustomMessage.h"
@@ -2789,7 +2790,13 @@ extern "C" COMBO_EXPORT void MM_ResumeGame(int fileNum) {
 // the tracker peek shows real items before MM is visited this session. Same headless load path
 // title_setup.c runs on resume (no gPlayState needed). Nonzero = nothing usable was loaded.
 extern "C" COMBO_EXPORT int MM_LoadSaveForCombo(int fileNum) {
-    return Combo_LoadMMSaveFile(fileNum + 1); // shares the saveType tripwire
+    int result = Combo_LoadMMSaveFile(fileNum + 1); // shares the saveType tripwire
+    // ComboShip: the entrance layout lives outside gSaveContext, and MM's logic (the dormant tracker
+    // and the reachability oracle) reads it before MM's own OnSaveLoad has had a chance to run.
+    if (result == 0) {
+        Rando::Entrance::ReadLayoutFromSave();
+    }
+    return result;
 }
 
 static void Combo_MM_ApplyCheckPrices();
@@ -2923,6 +2930,9 @@ extern "C" COMBO_EXPORT int MM_InitRandoSaveFile(int fileNum, const char* placem
                          unknownChecks, unknownItems, fileNum);
         }
         spoiler["checks"] = std::move(checks);
+        // ComboShip: the entrance layout was shuffled or installed by the launcher just before this
+        // call (EntranceCombo.cpp); passing it through the spoiler lets the shared apply persist it.
+        spoiler["entrances"] = Rando::Entrance::LayoutToJson();
 
         Rando::Spoiler::ApplyToSaveContext(spoiler);
 
@@ -3866,6 +3876,12 @@ static void GiveItemForOracle(RandoItemId ri) {
             break;
         }
     }
+}
+
+// ComboShip: lets the entrance shuffle (Rando/Entrance/EntranceCombo.cpp) grant items the same
+// headless-safe way the oracle does.
+void Combo_MM_GiveItemForOracle(RandoItemId randoItemId) {
+    GiveItemForOracle(randoItemId);
 }
 
 extern "C" COMBO_EXPORT void Combo_MM_Rando_Reset(void) {

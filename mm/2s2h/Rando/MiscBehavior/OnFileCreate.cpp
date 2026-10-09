@@ -2,6 +2,7 @@
 #include "Rando/Rando.h"
 #include "Rando/Spoiler/Spoiler.h"
 #include "Rando/Logic/Logic.h"
+#include "Rando/Entrance/Entrance.h"
 #include "2s2h/ShipUtils.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "ClockShuffle.h"
@@ -154,6 +155,16 @@ void Rando::MiscBehavior::OnFileCreate(s16 fileNum) {
                     if (Rando::Logic::ClockCount() == 0) {
                         throw std::runtime_error("Shuffle Time is enabled but no starting time was given");
                     }
+                }
+
+                // Entrances go first so the item logic below places against the final map
+                if (Rando::Entrance::AnyOptionEnabled()) {
+                    Rando::Entrance::Shuffle(itemPool);
+                    Rando::Entrance::WriteLayoutToSave();
+                    // Checking the layout gives items, which reseeds the generator
+                    Ship_Random_Seed(finalSeed);
+                } else {
+                    Rando::Entrance::ClearLayout();
                 }
 
                 if (RANDO_SAVE_OPTIONS[RO_LOGIC] == RO_LOGIC_VANILLA) {

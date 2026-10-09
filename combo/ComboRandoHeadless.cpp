@@ -187,6 +187,10 @@ int main(int argc, char** argv) {
     auto SOH_ShuffleEntrances = Sym<int (*)(uint64_t)>(soh, "SOH_ShuffleEntrancesForCombo");
     auto SOH_DumpEntranceOverrides = Sym<FnDump>(soh, "SOH_DumpEntranceOverrides");
     auto SOH_ApplyEntranceOverrides = Sym<int (*)(const char*)>(soh, "SOH_ApplyEntranceOverridesForCombo");
+    // MM entrance shuffle, same contract.
+    auto MM_ShuffleEntrances = Sym<int (*)(uint64_t)>(mm, "MM_ShuffleEntrancesForCombo");
+    auto MM_DumpEntranceLayout = Sym<FnDump>(mm, "MM_DumpEntranceLayout");
+    auto MM_ApplyEntranceLayout = Sym<int (*)(const char*)>(mm, "MM_ApplyEntranceLayoutForCombo");
     auto MM_Restore = Sym<FnOracleVoid>(mm, "Combo_MM_Rando_Restore");
     auto SOH_DumpEnabledTricks = Sym<FnDump>(soh, "SOH_DumpEnabledTricks");
     auto SOH_DumpRandoHintData = Sym<FnDump>(soh, "SOH_DumpRandoHintData"); // cross-hint verification
@@ -264,6 +268,7 @@ int main(int argc, char** argv) {
         auto ootEnabledTricks =
             spoiler.value("oot", nlohmann::json::object()).value("enabledTricks", nlohmann::json::array());
         auto ootEntrances = spoiler.value("entrances", nlohmann::json::object()).value("oot", nlohmann::json::array());
+        auto mmEntrances = spoiler.value("entrances", nlohmann::json::object()).value("mm", nlohmann::json::array());
 
         // Prices are part of the seed: an unknown price can never be treated as buyable, so a spoiler
         // without them can't be validated honestly. Hard-fail rather than emit an optimistic verdict.
@@ -332,6 +337,16 @@ int main(int argc, char** argv) {
                              "rebuild soh.dll; re-deriving (all-tricks pass may diverge)\n";
                 if (!SOH_ShuffleEntrances || !SOH_ShuffleEntrances(masterSeed))
                     entranceRestoreFailed = true;
+            }
+            // MM's layout lives in the DLL across oracle resets, so installing it once per pass is enough.
+            if (MM_ApplyEntranceLayout) {
+                if (!MM_ApplyEntranceLayout(mmEntrances.dump().c_str())) {
+                    std::cerr << "[playthrough] MM entrance apply failed — verdict unreliable\n";
+                    entranceRestoreFailed = true;
+                }
+            } else if (!mmEntrances.empty()) {
+                std::cerr << "[playthrough] spoiler has MM entrances but 2ship.dll lacks the apply export\n";
+                entranceRestoreFailed = true;
             }
             // Spoiler prices are the seed's truth — they override the dumps' re-rolls in every oracle
             // reset (SOH) / query (MM), so wallet gates evaluate against what the player actually pays.
@@ -597,7 +612,8 @@ int main(int argc, char** argv) {
             std::string forced = SOH_GetForced ? SOH_GetForced(masterSeed) : "";
             // Same placement as RunComboFill: after the dump/forced read, before the fill, so logic
             // validates the shuffled world. No-op when the entrance options are off.
-            if (SOH_ShuffleEntrances && !SOH_ShuffleEntrances(masterSeed)) {
+            if ((SOH_ShuffleEntrances && !SOH_ShuffleEntrances(masterSeed)) ||
+                (MM_ShuffleEntrances && !MM_ShuffleEntrances(masterSeed))) {
                 std::cerr << "[comborando] seed " << masterSeed << ": entrance shuffle found no valid layout\n";
                 if (mmStart && startCfg == 2)
                     pinStartOot = true;
@@ -715,7 +731,13 @@ int main(int argc, char** argv) {
                                 ootEnt = nlohmann::json::parse(SOH_DumpEntranceOverrides());
                             } catch (...) {}
                         }
-                        consolidated["entrances"] = { { "oot", std::move(ootEnt) } };
+                        nlohmann::json mmEnt = nlohmann::json::array();
+                        if (MM_DumpEntranceLayout) {
+                            try {
+                                mmEnt = nlohmann::json::parse(MM_DumpEntranceLayout());
+                            } catch (...) {}
+                        }
+                        consolidated["entrances"] = { { "oot", std::move(ootEnt) }, { "mm", std::move(mmEnt) } };
                     }
                     // Cross-hint generation (mirrors RunComboFill) — enables the headless determinism check.
                     consolidated["hints"] =

@@ -696,6 +696,88 @@ static void DrawLogicConditionsTab() {
     ImGui::EndChild();
 }
 
+static std::unordered_map<int32_t, const char*> entranceDungeonOptions = {
+    { RO_ENTRANCES_DUNGEONS_OFF, "Off" },
+    { RO_ENTRANCES_DUNGEONS_ON, "On" },
+    { RO_ENTRANCES_DUNGEONS_ON_PLUS_INVERTED, "On + Inverted Stone Tower" },
+};
+
+static std::unordered_map<int32_t, const char*> entranceInteriorOptions = {
+    { RO_ENTRANCES_INTERIORS_OFF, "Off" },
+    { RO_ENTRANCES_INTERIORS_SIMPLE, "Simple" },
+    { RO_ENTRANCES_INTERIORS_ALL, "All" },
+};
+
+static void EntranceCheckbox(const char* label, RandoOptionId optionId, const char* tooltip, bool disabled = false,
+                             const char* disabledTooltip = "") {
+    CVarCheckbox(label, Rando::StaticData::Options[optionId].cvar,
+                 CheckboxOptions({ { .tooltip = tooltip, .disabled = disabled, .disabledTooltip = disabledTooltip } }));
+}
+
+static bool EntranceOptionOff(RandoOptionId optionId) {
+    return CVarGetInteger(Rando::StaticData::Options[optionId].cvar, 0) == 0;
+}
+
+static void DrawEntrancesTab() {
+    f32 columnWidth = ImGui::GetContentRegionAvail().x / 2 - (ImGui::GetStyle().ItemSpacing.x * 2);
+    ImGui::BeginChild("randoEntrancesColumn1", ImVec2(columnWidth, 0));
+    ImGui::SeparatorText("Shuffle Entrances");
+    UIWidgets::CVarCombobox("Dungeon Entrances", Rando::StaticData::Options[RO_ENTRANCES_DUNGEONS].cvar,
+                            &entranceDungeonOptions);
+    UIWidgets::Tooltip("Shuffle the entrances of the four temples among each other.\n\n"
+                       "On - Woodfall, Snowhead, Great Bay and Stone Tower Temple.\n\n"
+                       "On + Inverted Stone Tower - Inverted Stone Tower Temple is shuffled as a fifth dungeon, "
+                       "so the upright and inverted temples can end up behind different doors.");
+    EntranceCheckbox("Boss Entrances", RO_ENTRANCES_BOSSES,
+                     "Shuffle which boss waits behind each temple's boss door. Defeating a boss still clears "
+                     "that boss's own region and warps you out to it.");
+    EntranceCheckbox("Overworld Entrances", RO_ENTRANCES_OVERWORLD,
+                     "Shuffle the transitions between areas: the Clock Town gates, the roads out of Termina "
+                     "Field, and the links between the areas beyond them.");
+    UIWidgets::CVarCombobox("Interior Entrances", Rando::StaticData::Options[RO_ENTRANCES_INTERIORS].cvar,
+                            &entranceInteriorOptions);
+    UIWidgets::Tooltip("Shuffle the doors of houses, shops and fountains.\n\n"
+                       "Simple - Interiors with a single door.\n\n"
+                       "All - Also the Stock Pot Inn, Curiosity Shop, Astral Observatory, Goron Shrine, both "
+                       "Spider Houses, the Secret Shrine, the Deku Shrine and the graves in Ikana Graveyard.\n\n"
+                       "The Clock Tower and Sakon's Hideout are never shuffled.");
+    EntranceCheckbox("Grotto Entrances", RO_ENTRANCES_GROTTOS,
+                     "Shuffle which grotto each hole in the ground leads to.");
+    EntranceCheckbox("Owl Warps", RO_ENTRANCES_OWL_WARPS,
+                     "Each Song of Soaring destination takes you to a random place in the overworld instead of "
+                     "its owl statue. Statues still have to be struck to unlock their warp.");
+    EntranceCheckbox("Cycle Start", RO_ENTRANCES_SPAWN,
+                     "The place you start each three-day cycle, and return to with the Song of Time, is a random "
+                     "place in the overworld instead of South Clock Town.");
+    ImGui::EndChild();
+    ImGui::SameLine();
+    ImGui::BeginChild("randoEntrancesColumn2", ImVec2(columnWidth, 0));
+    ImGui::SeparatorText("Shuffle Behavior");
+    EntranceCheckbox("Decouple Entrances", RO_ENTRANCES_DECOUPLE,
+                     "Going back through a door no longer returns you to where you came from: each direction of "
+                     "every shuffled door is placed on its own.");
+    EntranceCheckbox("Mixed Entrance Pools", RO_ENTRANCES_MIXED_POOLS,
+                     "Shuffle the selected kinds of entrance together, so a house door can lead to a temple or a "
+                     "hole in the ground to another area. At least two kinds have to be selected below.");
+    bool mixedOff = EntranceOptionOff(RO_ENTRANCES_MIXED_POOLS);
+    const char* mixDisabled = "Enable Mixed Entrance Pools and shuffle this kind of entrance first.";
+    ImGui::Indent(20.0f);
+    EntranceCheckbox("Mix Dungeons", RO_ENTRANCES_MIX_DUNGEONS, "Dungeon entrances join the mixed pool.",
+                     mixedOff || EntranceOptionOff(RO_ENTRANCES_DUNGEONS), mixDisabled);
+    EntranceCheckbox("Mix Overworld", RO_ENTRANCES_MIX_OVERWORLD, "Overworld entrances join the mixed pool.",
+                     mixedOff || EntranceOptionOff(RO_ENTRANCES_OVERWORLD), mixDisabled);
+    EntranceCheckbox("Mix Interiors", RO_ENTRANCES_MIX_INTERIORS, "Interior entrances join the mixed pool.",
+                     mixedOff || EntranceOptionOff(RO_ENTRANCES_INTERIORS), mixDisabled);
+    EntranceCheckbox("Mix Grottos", RO_ENTRANCES_MIX_GROTTOS, "Grotto entrances join the mixed pool.",
+                     mixedOff || EntranceOptionOff(RO_ENTRANCES_GROTTOS), mixDisabled);
+    ImGui::Unindent(20.0f);
+    ImGui::SeparatorText("Entrance Tracker");
+    CVarCheckbox("Show Entrance Tracker", "gWindows.EntranceTracker",
+                 CheckboxOptions({ { .tooltip = "A window listing every shuffled entrance and, once you have been "
+                                                "through it, where it leads." } }));
+    ImGui::EndChild();
+}
+
 struct SceneryDropGroup {
     const char* label;
     RandoOptionId optionId;
@@ -1769,6 +1851,10 @@ void Rando::RegisterMenu() {
     mBenMenu->AddWidget(path, "Item Pool", WIDGET_CUSTOM)
         .CustomFunction([](WidgetInfo& info) { DrawItemPoolTab(); })
         .HideInSearch(true);
+
+    mBenMenu->AddSidebarEntry("Rando", "Entrances", 1);
+    path.sidebarName = "Entrances";
+    mBenMenu->AddWidget(path, "Entrances", WIDGET_CUSTOM).CustomFunction([](WidgetInfo& info) { DrawEntrancesTab(); });
 
     mBenMenu->AddSidebarEntry("Rando", "Starting Items", 1);
     path.sidebarName = "Starting Items";

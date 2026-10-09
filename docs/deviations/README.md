@@ -9,6 +9,7 @@ Entries are split by subsystem, one file each. See [../UPSTREAM_MERGES.md](../UP
 for the merge mechanism and standing policies.
 
 - [`rando.md`](rando.md) — Randomizer & cross-world fill: the cross-world generator, foreign-item delivery, hints, and per-game logic/accessibility honoring.
+- [`mm-entrance-rando.md`](mm-entrance-rando.md) — MM entrance randomizer: pools, shuffle and validation, runtime hook, save format, and combo exports.
 - [`anchor.md`](anchor.md) — Anchor networking: the launcher-owned connection, MM Anchor adapter phases, and co-op sync hardening.
 - [`tracker.md`](tracker.md) — Trackers & notifications: cross-game tracker/toast window collision fixes, active-game gating, and the both-games tracker model.
 - [`resource-mgmt.md`](resource-mgmt.md) — Resource manager & rendering: cross-RM display-list resolution, Fast3D segment guards, RM-scoped audio/cosmetics, and shader/texture fixes.

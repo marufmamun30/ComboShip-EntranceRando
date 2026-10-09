@@ -1,5 +1,6 @@
 #include "Spoiler.h"
 #include "Rando/Rando.h"
+#include "Rando/Entrance/Entrance.h"
 #include <libultraship/bridge/consolevariablebridge.h>
 #include "ShipUtils.h"
 
@@ -22,6 +23,9 @@ void ApplyToSaveContext(nlohmann::json spoiler) {
     if (!RANDO_SAVE_OPTIONS[RO_SHUFFLE_GOLD_SKULLTULAS]) {
         RANDO_SAVE_OPTIONS[RO_SKULLTULA_TOKENS_REQUIRED] = SPIDER_HOUSE_TOKENS_REQUIRED;
     }
+
+    Rando::Entrance::LayoutFromJson(spoiler.value("entrances", nlohmann::json::array()));
+    Rando::Entrance::WriteLayoutToSave();
 
     auto startingItems = Rando::GetStartingItemsFromSpoiler(spoiler);
     Rando::SetStartingItemsInSave(gSaveContext.save.shipSaveInfo.rando, startingItems);

@@ -1,5 +1,6 @@
 #include "Spoiler.h"
 #include "Rando/Rando.h"
+#include "Rando/Entrance/Entrance.h"
 
 namespace Rando {
 
@@ -21,6 +22,10 @@ nlohmann::json GenerateFromSaveContext() {
 
     auto priorityItems = Rando::GetSariaPriorityItemsFromSave(gSaveContext.save.shipSaveInfo.rando);
     Rando::SetSariaPriorityItemsInSpoiler(spoiler, priorityItems);
+
+    if (Rando::Entrance::IsShuffled()) {
+        spoiler["entrances"] = Rando::Entrance::LayoutToJson();
+    }
 
     spoiler["checks"] = nlohmann::json::object();
     for (auto& [randoCheckId, randoStaticCheck] : Rando::StaticData::Checks) {

@@ -3345,6 +3345,21 @@ typedef enum {
     RO_TRAP_AMOUNT,
     RO_TRIFORCE_PIECES_MAX,
     RO_TRIFORCE_PIECES_REQUIRED,
+    // Entrance randomizer. Appended rather than sorted in: the save stores options by index, so
+    // inserting these alphabetically would shift every option after them in existing saves.
+    RO_ENTRANCES_DUNGEONS,
+    RO_ENTRANCES_BOSSES,
+    RO_ENTRANCES_OVERWORLD,
+    RO_ENTRANCES_INTERIORS,
+    RO_ENTRANCES_GROTTOS,
+    RO_ENTRANCES_OWL_WARPS,
+    RO_ENTRANCES_SPAWN,
+    RO_ENTRANCES_MIXED_POOLS,
+    RO_ENTRANCES_MIX_DUNGEONS,
+    RO_ENTRANCES_MIX_OVERWORLD,
+    RO_ENTRANCES_MIX_INTERIORS,
+    RO_ENTRANCES_MIX_GROTTOS,
+    RO_ENTRANCES_DECOUPLE,
     RO_MAX,
 } RandoOptionId;
 
@@ -3357,6 +3372,18 @@ typedef enum {
     RO_GENERIC_NO,
     RO_GENERIC_YES,
 } RandoOptionGenericNoYes;
+
+typedef enum {
+    RO_ENTRANCES_DUNGEONS_OFF,
+    RO_ENTRANCES_DUNGEONS_ON,
+    RO_ENTRANCES_DUNGEONS_ON_PLUS_INVERTED,
+} RandoOptionEntrancesDungeons;
+
+typedef enum {
+    RO_ENTRANCES_INTERIORS_OFF,
+    RO_ENTRANCES_INTERIORS_SIMPLE,
+    RO_ENTRANCES_INTERIORS_ALL,
+} RandoOptionEntrancesInteriors;
 
 typedef enum {
     RO_LOGIC_GLITCHLESS,

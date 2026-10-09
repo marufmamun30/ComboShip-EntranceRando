@@ -379,6 +379,17 @@ typedef struct RandoSaveCheck {
     u16 price; // Only applicable for shops/merchants
 } RandoSaveCheck;
 
+// One shuffled entrance: taking the door that vanilla sends to `fromTo` (and returns through
+// `fromReturn`) instead arrives where the door `toTo`/`toReturn` would. 0xFFFF marks a one-way.
+typedef struct RandoEntranceOverride {
+    u16 fromTo;
+    u16 fromReturn;
+    u16 toTo;
+    u16 toReturn;
+} RandoEntranceOverride;
+
+#define RANDO_ENTRANCE_OVERRIDES_MAX 384
+
 typedef struct RandoSaveInfo {
     u16 randoInf[(RANDO_INF_MAX + 15) / 16];
     u8 randoEvents[RE_MAX]; // This is purely for logic tracking, not to be used for anything else
@@ -390,6 +401,9 @@ typedef struct RandoSaveInfo {
     u16 foundTriforcePieces;
     u8 sariaHintsAvailable;
     u16 sariaPriorityItems[16];
+    u16 entranceOverrideCount;
+    RandoEntranceOverride entranceOverrides[RANDO_ENTRANCE_OVERRIDES_MAX];
+    u8 entranceDiscovered[(RANDO_ENTRANCE_OVERRIDES_MAX + 7) / 8]; // One bit per override, for the tracker
 #ifdef COMBO_BUILD
     u8 pendingTrapCount; // ComboShip: cross-world traps granted while MM was dormant; drained on activation
 #endif

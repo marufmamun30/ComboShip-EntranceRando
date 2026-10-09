@@ -383,6 +383,21 @@ static FnOracleVoid Combo_MM_Rando_Restore = nullptr;
 typedef int (*FnShuffleEntrances)(uint64_t);
 static FnShuffleEntrances SOH_ShuffleEntrancesForCombo = nullptr;
 static FnDumpData SOH_DumpEntranceOverrides = nullptr;
+// MM entrance shuffle: same contract as OOT's, plus an apply so a slot's MM save is always built
+// from the layout its seed recorded rather than one re-derived under different code or settings.
+static FnShuffleEntrances MM_ShuffleEntrancesForCombo = nullptr;
+static FnDumpData MM_DumpEntranceLayout = nullptr;
+typedef int (*FnApplyEntrances)(const char*);
+static FnApplyEntrances MM_ApplyEntranceLayoutForCombo = nullptr;
+
+// Shuffles both games' entrances for a seed. Each is a no-op when its entrance options are off.
+static bool Combo_ShuffleEntrances(uint64_t seed) {
+    if (SOH_ShuffleEntrancesForCombo && !SOH_ShuffleEntrancesForCombo(seed))
+        return false;
+    if (MM_ShuffleEntrancesForCombo && !MM_ShuffleEntrancesForCombo(seed))
+        return false;
+    return true;
+}
 
 // ---------- ComboShip merged per-slot save container (Save/file{N+1}.combosav) ----------
 // One JSON file per slot holds both games' saves verbatim + combo metadata (completion + baked rando).
@@ -1710,11 +1725,11 @@ static void RunComboFill(std::string inputSeed, ComboRando::ComboGenProgress* pr
 
         // ComboShip (#90): OOT entrance shuffle. Runs after the dump (settings finalized) and before the
         // fill, so logic validates the shuffled world. No-op when the entrance options are off.
-        if (SOH_ShuffleEntrancesForCombo && !SOH_ShuffleEntrancesForCombo(masterSeed)) {
+        if (!Combo_ShuffleEntrances(masterSeed)) {
             // A different masterSeed yields a different layout, so reroll rather than sending the user
             // to the settings; the post-loop check reports it if every attempt fails. Mirrors the loop
             // tail's MM restore, which this skips.
-            lastFillError = "OOT entrance shuffle found no valid layout — relax the entrance settings";
+            lastFillError = "Entrance shuffle found no valid layout — relax the entrance settings";
             std::cout << "[ComboShip] RunComboFill: attempt " << (attempt + 1) << "/" << kFillAttempts
                       << " failed: " << lastFillError << "\n";
             if (mmStart && startCfg == 2)
@@ -1975,7 +1990,14 @@ static void RunComboFill(std::string inputSeed, ComboRando::ComboGenProgress* pr
                     ootEnt = nlohmann::json::parse(SOH_DumpEntranceOverrides());
                 } catch (...) {}
             }
-            consolidated["entrances"] = { { "oot", std::move(ootEnt) } };
+            // MM's layout is not informational: it is what the slot's MM save is built from.
+            nlohmann::json mmEnt = nlohmann::json::array();
+            if (MM_DumpEntranceLayout) {
+                try {
+                    mmEnt = nlohmann::json::parse(MM_DumpEntranceLayout());
+                } catch (...) {}
+            }
+            consolidated["entrances"] = { { "oot", std::move(ootEnt) }, { "mm", std::move(mmEnt) } };
         }
         // ComboShip: cross-game hint generation (Phase 3) — real per-seed hint assignments, from the
         // pare-down computed above. usedCombinedFill guards the no-logic fallback path (no oracles/
@@ -2073,8 +2095,8 @@ static int RunComboGenTest(int numSeeds, uint32_t seedBase) {
             if (SOH_GetForcedPlacements)
                 forcedOot = SOH_GetForcedPlacements(seed);
             // Per-seed OOT entrance layout, exactly like the real generator (no-op when the options are off).
-            if (SOH_ShuffleEntrancesForCombo && !SOH_ShuffleEntrancesForCombo(seed)) {
-                result.error = "OOT entrance shuffle found no valid layout";
+            if (!Combo_ShuffleEntrances(seed)) {
+                result.error = "Entrance shuffle found no valid layout";
                 if (mmStart && startCfg == 2)
                     pinStartOot = true;
                 Combo_MM_Rando_Restore();
@@ -2169,8 +2191,8 @@ static void RunComboPlaythrough(const std::string& inputSeed) {
         std::string forcedOot;
         if (SOH_GetForcedPlacements)
             forcedOot = SOH_GetForcedPlacements(masterSeed);
-        if (SOH_ShuffleEntrancesForCombo && !SOH_ShuffleEntrancesForCombo(masterSeed)) {
-            fill.error = "OOT entrance shuffle found no valid layout";
+        if (!Combo_ShuffleEntrances(masterSeed)) {
+            fill.error = "Entrance shuffle found no valid layout";
             if (mmStart && startCfg == 2)
                 pinStartOot = true;
             Combo_MM_Rando_Restore();
@@ -2632,6 +2654,16 @@ static void Combo_OnOOTSaveInit(int fileNum) {
         // them) — never at reload time, so they can't leak into comboship.json before a slot is bound.
         if (!g_PendingMMSettingsJson.empty() && MM_RestoreRandoSettings)
             MM_RestoreRandoSettings(g_PendingMMSettingsJson.c_str());
+        // Install the entrance layout this seed recorded (none recorded = vanilla), so the save never
+        // picks up whatever layout the MM DLL last generated or loaded.
+        if (MM_ApplyEntranceLayoutForCombo &&
+            !MM_ApplyEntranceLayoutForCombo(seed.value("entrances", nlohmann::json::object())
+                                                .value("mm", nlohmann::json::array())
+                                                .dump()
+                                                .c_str())) {
+            std::cerr << "[ComboShip] ERROR: MM entrance layout for slot " << fileNum
+                      << " could not be applied — its MM entrances are vanilla and may not match logic." << std::endl;
+        }
         if (MM_InitRandoSaveFile(fileNum, mmPlacements.c_str(), playerName) != 0) {
             std::cerr << "[ComboShip] ERROR: MM rando save creation FAILED for slot " << fileNum
                       << " — this slot's MM save has no placements. Re-create it." << std::endl;
@@ -3027,6 +3059,9 @@ int main(int argc, char** argv) {
     // OOT entrance-shuffle wiring (#90)
     SOH_ShuffleEntrancesForCombo = (FnShuffleEntrances)GetSym(sohModule, "SOH_ShuffleEntrancesForCombo");
     SOH_DumpEntranceOverrides = (FnDumpData)GetSym(sohModule, "SOH_DumpEntranceOverrides");
+    MM_ShuffleEntrancesForCombo = (FnShuffleEntrances)GetSym(mmModule, "MM_ShuffleEntrancesForCombo");
+    MM_DumpEntranceLayout = (FnDumpData)GetSym(mmModule, "MM_DumpEntranceLayout");
+    MM_ApplyEntranceLayoutForCombo = (FnApplyEntrances)GetSym(mmModule, "MM_ApplyEntranceLayoutForCombo");
 
     // Cross-game erase seam (issue #1)
     SOH_SetComboSaveIO = (FnSetComboSaveIO)GetSym(sohModule, "SOH_SetComboSaveIO");
